@@ -38,7 +38,7 @@ def transformation_from_charge(Q, t, t1, t2):
     for i in range(3):
         polynomial_fit = np.polyfit(t[idx1:idx2], Q[idx1:idx2, i], deg=1)
         space_translation.append(polynomial_fit[1])
-        boost_velocity.append(polynomial_fit[1])
+        boost_velocity.append(polynomial_fit[0])
 
     transformation = {
         "space_translation": np.array(space_translation),
@@ -176,12 +176,18 @@ def obtain_previous_map_to_bms(transformations, json_file):
                 previous_map_to_bms[transformation] = ast.literal_eval(map_to_bms_from_file[transformation])
     return previous_map_to_bms
 
-def obtain_map_to_bms_initial_guess(previous_map_to_bms, new_transformation, abd, h_target, t1, t2, use_educated_guess=True):
+def obtain_map_to_bms_initial_guess(previous_map_to_bms, new_transformation, abd, h_target, t1, t2, use_educated_guess=False):
     initial_guess = previous_map_to_bms.copy()
 
-    combined_transformations = combine_transformations_to_supertranslation(previous_map_to_bms)
-    
-    abd_prime = transform_abd(abd, combined_transformations)
+    # because the space_translation is applied after the time_translation
+    if new_transformation == "space_translation":
+        abd_prime = abd.transform(time_translation=previous_map_to_bms["time_translation"])
+    elif "supertranslation" in new_transformation and new_transformation != "supertranslation_ell_2":
+        combined_transformations = combine_transformations_to_supertranslation(previous_map_to_bms)
+        abd_prime = abd.transform(supertranslation=combined_transformations["supertranslation"])
+    else:
+        combined_transformations = combine_transformations_to_supertranslation(previous_map_to_bms)
+        abd_prime = transform_abd(abd, combined_transformations)
 
     if new_transformation == "time_translation":
         initial_guess[new_transformation] = [0.0]
@@ -381,7 +387,7 @@ def write_map_to_bms(output_map_to_bms, times, errors, json_file):
     with open(json_file, 'w') as f:
         json.dump(reordered_map_to_bms, f, indent=2, separators=(",", ": "), ensure_ascii=True)
 
-def map_to_bms_frame(self, h_target, json_file, map_to_bms=None, t1=None, t2=None, bounds=None):
+def map_to_bms_frame(self, h_target, json_file, map_to_bms=None, t1=None, t2=None, bounds=None, use_educated_guess=False):
     """Map an AsymptoticBondiData object to the BMS frame of another object
 
     Parameters
@@ -459,7 +465,7 @@ def map_to_bms_frame(self, h_target, json_file, map_to_bms=None, t1=None, t2=Non
         print("Previous Map: ", previous_map_to_bms, "\n")
         
         map_to_bms_initial_guess = obtain_map_to_bms_initial_guess(previous_map_to_bms, transformations[-1], abd, h_target, t1, t2,\
-                                                                   use_educated_guess=True)
+                                                                   use_educated_guess=use_educated_guess)
 
         print("IG: ", map_to_bms_initial_guess, "\n")
 
