@@ -1,17 +1,16 @@
-from math import sqrt, pi
 import numpy as np
 from spherical_functions import LM_total_size
 from .. import ModesTimeSeries
+from .. import Inertial
+from .. import sigma, psi4, psi3, psi2, psi1, psi0
 
 
 class AsymptoticBondiData:
     """Class to store asymptotic Bondi data
-
     This class stores time data, along with the corresponding values of psi0 through psi4 and sigma.
     For simplicity, the data are stored as one contiguous array.  That is, *all* values are stored
     at all times, even if they are zero, and all Modes objects are stored with ell_min=0, even when
     their spins are not zero.
-
     The single contiguous array is then viewed as 6 separate ModesTimeSeries objects, which enables
     them to track their spin weights, and provides various convenient methods like `eth` and
     `ethbar`; `dot` and `ddot` for time-derivatives; `int` and `iint` for time-integrations; `norm`
@@ -19,21 +18,17 @@ class AsymptoticBondiData:
     different from just conjugating the mode weights); etc.  It also handles algebra correctly --
     particularly addition (which is disallowed when the spin weights differ) and multiplication
     (which can be delicate with regards to the resulting ell values).
-
     This may lead to some headaches when the user tries to do things that are disabled by Modes
     objects.  The goal is to create headaches if and only if the user is trying to do things that
     really should never be done (like conjugating mode weights, rather than the underlying function;
     adding modes with different spin weights; etc.).  Please open issues for any situations that
     don't meet this standard.
-
     This class also provides various convenience methods for computing things like the mass aspect,
     the Bondi four-momentum, the Bianchi identities, etc.
-
     """
 
-    def __init__(self, time, ell_max, multiplication_truncator=sum):
+    def __init__(self, time, ell_max, multiplication_truncator=sum, frameType=Inertial):
         """Create new storage for asymptotic Bondi data
-
         Parameters
         ==========
         time: int or array_like
@@ -48,7 +43,6 @@ class AsymptoticBondiData:
             also the most wasteful, and very likely to be overkill.  The user should probably always
             use `max`.  (Unfortunately, this must remain an opt-in choice, to ensure that the user
             is aware of the situation.)
-
         """
         import functools
 
@@ -61,6 +55,8 @@ class AsymptoticBondiData:
             raise ValueError(f"Input `time` parameter must have dtype float; it has dtype {time.dtype}")
         ModesTS = functools.partial(ModesTimeSeries, ell_max=ell_max, multiplication_truncator=multiplication_truncator)
         shape = [6, time.size, LM_total_size(0, ell_max)]
+        self.frame = np.array([])
+        self.frameType = frameType
         self._time = time.copy()
         self._raw_data = np.zeros(shape, dtype=complex)
         self._psi0 = ModesTS(self._raw_data[0], self._time, spin_weight=2)
@@ -98,6 +94,10 @@ class AsymptoticBondiData:
     @property
     def ell_max(self):
         return self._psi2.ell_max
+
+    @property
+    def LM(self):
+        return self.psi2.LM
 
     @property
     def sigma(self):
@@ -153,57 +153,110 @@ class AsymptoticBondiData:
         self._psi0[:] = psi0prm
         return self.psi0
 
-    from .from_initial_values import from_initial_values
+    def copy(self):
+        import copy
 
-    def mass_aspect(self, truncate_ell=max):
-        """Compute the Bondi mass aspect of the AsymptoticBondiData
+        new_abd = type(self)(self.t, self.ell_max)
+        state = copy.deepcopy(self.__dict__)
+        new_abd.__dict__.update(state)
+        return new_abd
 
-        The Bondi mass aspect is given by
+    def interpolate(self, new_times):
+        new_abd = type(self)(new_times, self.ell_max)
+        new_abd.frameType = self.frameType
+        # interpolate waveform data
+        new_abd.sigma = self.sigma.interpolate(new_times)
+        new_abd.psi4 = self.psi4.interpolate(new_times)
+        new_abd.psi3 = self.psi3.interpolate(new_times)
+        new_abd.psi2 = self.psi2.interpolate(new_times)
+        new_abd.psi1 = self.psi1.interpolate(new_times)
+        new_abd.psi0 = self.psi0.interpolate(new_times)
+        # interpolate frame data if necessary
+        if self.frame.shape[0] == self.n_times:
+            from scipy.interpolate import CubicSpline
+            import quaternion
 
-            \\Psi = \\psi_2 + \\eth \\eth \bar{\\sigma} + \\sigma * \\dot{\bar{\\sigma}}
+            frame = quaternion.as_float_array(self.frame)
+            new_frame = CubicSpline(self.t, frame, axis=0)(new_times)
+            new_abd.frame = quaternion.as_quat_array(new_frame)
+        return new_abd
 
-        Note that the last term is a product between two fields.  If, for example, these both have
-        ell_max=8, then their full product would have ell_max=16, meaning that we would go from
-        tracking 77 modes to 289.  This shows that deciding how to truncate the output ell is
-        important, which is why this function has the extra argument that it does.
+    def select_data(self, dataType):
+        if dataType == sigma:
+            return self.sigma
+        elif dataType == psi4:
+            return self.psi4
+        elif dataType == psi3:
+            return self.psi3
+        elif dataType == psi2:
+            return self.psi2
+        elif dataType == psi1:
+            return self.psi1
+        elif dataType == psi0:
+            return self.psi0
 
-        Parameters
-        ==========
-        truncate_ell: int, or callable [defaults to `max`]
-            Determines how the ell_max value of the output is determined.  If an integer is passed,
-            each term in the output is truncated to have at most that ell_max.  (In particular,
-            terms that will not be used in the output are simply not computed, without incurring any
-            errors due to aliasing.)  If a callable is passed, it is passed on to the
-            spherical_functions.Modes.multiply method.  See that function's docstring for details.
-            The default behavior will result in the output having ell_max equal to the largest of
-            any of the individual Modes objects in the equation for \\Psi above -- but not the
-            product.
-
+    def speciality_index(self, **kwargs):
+        """Computes the Baker-Campanelli speciality index (arXiv:gr-qc/0003031). NOTE: This quantity can only 
+        determine algebraic speciality but can not determine the type! The rule of thumb given by Baker and
+        Campanelli is that for an algebraically special spacetime the speciality index should differ from unity 
+        by no more than a factor of two.
         """
-        if callable(truncate_ell):
-            return self.psi2 + self.sigma.bar.eth.eth + self.sigma.multiply(self.sigma.bar.dot, truncator=truncate_ell)
-        elif truncate_ell:
-            return (
-                self.psi2.truncate_ell(truncate_ell)
-                + self.sigma.bar.eth.eth.truncate_ell(truncate_ell)
-                + self.sigma.multiply(self.sigma.bar.dot, truncator=lambda tup: truncate_ell)
-            )
-        else:
-            return self.psi2 + self.sigma.bar.eth.eth + self.sigma * self.sigma.bar.dot
 
-    @property
-    def bondi_four_momentum(self):
-        """Compute the Bondi four-momentum of the AsymptoticBondiData"""
+        import spinsfast
         import spherical_functions as sf
+        from spherical_functions import LM_index
 
-        P_restricted = -self.mass_aspect(1).view(np.ndarray) / sqrt(4 * pi)  # Compute only the parts we need, ell<=1
-        four_momentum = np.empty(P_restricted.shape, dtype=float)
-        four_momentum[..., 0] = P_restricted[..., 0].real
-        four_momentum[..., 1] = (P_restricted[..., 3] - P_restricted[..., 1]).real / sqrt(6)
-        four_momentum[..., 2] = (1j * (P_restricted[..., 3] + P_restricted[..., 1])).real / sqrt(6)
-        four_momentum[..., 3] = -P_restricted[..., 2].real / sqrt(3)
-        return four_momentum
+        output_ell_max = kwargs.pop("output_ell_max") if "output_ell_max" in kwargs else self.ell_max
+        working_ell_max = kwargs.pop("working_ell_max") if "working_ell_max" in kwargs else 2 * self.ell_max
+        n_theta = n_phi = 2 * working_ell_max + 1
 
+        # Transform to grid representation
+        psi4 = np.empty((self.n_times, n_theta, n_phi), dtype=complex)
+        psi3 = np.empty((self.n_times, n_theta, n_phi), dtype=complex)
+        psi2 = np.empty((self.n_times, n_theta, n_phi), dtype=complex)
+        psi1 = np.empty((self.n_times, n_theta, n_phi), dtype=complex)
+        psi0 = np.empty((self.n_times, n_theta, n_phi), dtype=complex)
+
+        for t_i in range(self.n_times):
+            psi4[t_i, :, :] = spinsfast.salm2map(
+                self.psi4.ndarray[t_i, :], self.psi4.spin_weight, lmax=self.ell_max, Ntheta=n_theta, Nphi=n_phi
+            )
+            psi3[t_i, :, :] = spinsfast.salm2map(
+                self.psi3.ndarray[t_i, :], self.psi3.spin_weight, lmax=self.ell_max, Ntheta=n_theta, Nphi=n_phi
+            )
+            psi2[t_i, :, :] = spinsfast.salm2map(
+                self.psi2.ndarray[t_i, :], self.psi2.spin_weight, lmax=self.ell_max, Ntheta=n_theta, Nphi=n_phi
+            )
+            psi1[t_i, :, :] = spinsfast.salm2map(
+                self.psi1.ndarray[t_i, :], self.psi1.spin_weight, lmax=self.ell_max, Ntheta=n_theta, Nphi=n_phi
+            )
+            psi0[t_i, :, :] = spinsfast.salm2map(
+                self.psi0.ndarray[t_i, :], self.psi0.spin_weight, lmax=self.ell_max, Ntheta=n_theta, Nphi=n_phi
+            )
+
+        curvature_invariant_I = psi4 * psi0 - 4 * psi3 * psi1 + 3 * psi2 ** 2
+        curvature_invariant_J = (
+            psi4 * (psi2 * psi0 - psi1 ** 2) - psi3 * (psi3 * psi0 - psi1 * psi2) + psi2 * (psi3 * psi1 - psi2 ** 2)
+        )
+        speciality_index = 27 * curvature_invariant_J ** 2 / curvature_invariant_I ** 3
+
+        # Transform back to mode representation
+        speciality_index_modes = np.empty((self.n_times, (working_ell_max) ** 2), dtype=complex)
+        for t_i in range(self.n_times):
+            speciality_index_modes[t_i, :] = spinsfast.map2salm(speciality_index[t_i, :], 0, lmax=working_ell_max - 1)
+
+        # Convert product ndarray to a ModesTimeSeries object
+        speciality_index_modes = speciality_index_modes[:, : LM_index(output_ell_max, output_ell_max, 0) + 1]
+        speciality_index_modes = ModesTimeSeries(
+            sf.SWSH_modes.Modes(
+                speciality_index_modes, spin_weight=0, ell_min=0, ell_max=output_ell_max, multiplication_truncator=max
+            ),
+            time=self.t,
+        )
+        return speciality_index_modes
+
+    from .from_initial_values import from_initial_values
+    from .transformations import transform
     from .constraints import (
         bondi_constraints,
         bondi_violations,
@@ -215,5 +268,24 @@ class AsymptoticBondiData:
         constraint_4,
         constraint_mass_aspect,
     )
-
-    from .transformations import transform
+    from .bms_charges import (
+        mass_aspect,
+        bondi_rest_mass,
+        bondi_four_momentum,
+        bondi_angular_momentum,
+        bondi_dimensionless_spin,
+        bondi_boost_charge,
+        bondi_comoving_CoM_charge,
+        bondi_dimensionless_spin_from_comom,
+        supermomentum,
+    )
+    from .map_to_bms_frame import (
+        map_to_bms_frame
+    )
+    from .frame_rotations import (
+        to_inertial_frame,
+        to_corotating_frame,
+        to_coprecessing_frame,
+        rotate_physical_system,
+        rotate_decomposition_basis,
+    )
