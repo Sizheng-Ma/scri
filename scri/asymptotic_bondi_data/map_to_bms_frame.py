@@ -181,7 +181,7 @@ def obtain_map_to_bms_initial_guess(previous_map_to_bms, new_transformation, abd
 
     # because the space_translation is applied after the time_translation
     if new_transformation == "space_translation":
-        abd_prime = abd.transform(time_translation=previous_map_to_bms["time_translation"])
+        abd_prime = abd.transform(time_translation=previous_map_to_bms["time_translation"][0])
     elif "supertranslation" in new_transformation and new_transformation != "supertranslation_ell_2":
         combined_transformations = combine_transformations_to_supertranslation(previous_map_to_bms)
         abd_prime = abd.transform(supertranslation=combined_transformations["supertranslation"])
