@@ -280,7 +280,8 @@ class AsymptoticBondiData:
         supermomentum,
     )
     from .map_to_bms_frame import (
-        map_to_bms_frame
+        transformation_to_map_to_pn_bms_frame,
+        transformation_to_map_to_superrest_frame,
     )
     from .frame_rotations import (
         to_inertial_frame,
