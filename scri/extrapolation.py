@@ -232,6 +232,8 @@ def datatype_from_filename(filename):
         DataType = scri.psi1
     elif "psi0" in DataType.lower():
         DataType = scri.psi0
+    elif "KG" in DataType:
+        DataType = scri.psi2
     else:
         DataType = scri.UnknownDataType
         message = (
@@ -344,8 +346,8 @@ def read_finite_radius_waveform(filename, groupname, WaveformName, ChMass):
         UnitScaleFactor = 1.0
         RadiusRatioExp = 2.0
     elif waveform.dataType == scri.psi2:
-        UnitScaleFactor = 1.0 / ChMass
-        RadiusRatioExp = 3.0
+        UnitScaleFactor = 1.0  
+        RadiusRatioExp = 0.0
     elif waveform.dataType == scri.psi1:
         UnitScaleFactor = 1.0 / ChMass ** 2
         RadiusRatioExp = 4.0
@@ -462,8 +464,8 @@ def read_finite_radius_data(ChMass=0.0,
             stdout.write(WaveformNameString)
             stdout.flush()
             PrintedLine += WaveformNameString
-        Ws[n], Radii[n] = read_finite_radius_waveform(filename,groupname,
-                                                      WaveformNames[n],
+        Ws[n], Radii[n] = read_finite_radius_waveform(filename,groupname, #groupname=None
+                                                      WaveformNames[n],  # different radius
                                                       ChMass)
     return Ws, Radii, CoordRadii
 
@@ -650,7 +652,7 @@ def extrapolate(**kwargs):
     Ws, Radii, CoordRadii = read_finite_radius_data(
         ChMass=ChMass, filename=DataFile, CoordRadii=CoordRadii)
 
-    Radii_shape = (len(Radii), len(Radii[0]))
+    Radii_shape = (len(Radii), len(Radii[0])) # the second entry is time
 
     # Make sure there are enough radii to do the requested extrapolations
     if (len(Ws) <= max(ExtrapolationOrders)) and (max(ExtrapolationOrders) > -1):
@@ -1369,8 +1371,8 @@ def _Extrapolate(FiniteRadiusWaveforms, Radii, ExtrapolationOrders, Omegas=None,
                     continue
 
                 # Do the extrapolations
-                re = numpy.polyfit(OneOverRadii, Re, N)[-1, :]
-                im = numpy.polyfit(OneOverRadii, Im, N)[-1, :]
+                re = numpy.polyfit(OneOverRadii, Re, N)[-2, :]
+                im = numpy.polyfit(OneOverRadii, Im, N)[-2, :]
 
                 # Record the results
                 extrapolated_data[i_N, i_t, :] = re[:] + 1j * im[:]
