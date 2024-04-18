@@ -258,6 +258,8 @@ def supertranslation_to_map_to_superrest_frame(
     rel_err = np.inf
     rel_errs = [np.inf]
     while itr < N_itr_max and not rel_err < rel_err_tol:
+        print("within supertranslation")
+        print(itr)
         prev_alpha_Grid = sf.SWSH_grids.Grid(alpha_Grid.copy(), spin_weight=0)
 
         if itr == 0:
@@ -368,6 +370,8 @@ def com_transformation_to_map_to_superrest_frame(abd, N_itr_max=10, rel_err_tol=
     rel_err = np.inf
     rel_errs = [np.inf]
     while itr < N_itr_max and not rel_err < rel_err_tol:
+        print("within com")
+        print(itr)
         if itr == 0:
             abd_prime = abd.copy()
             G_prime = abd_prime.bondi_CoM_charge() / abd_prime.bondi_four_momentum()[:, 0, None]
@@ -528,6 +532,8 @@ def rotation_to_map_to_superrest_frame(abd, target_strain=None, N_itr_max=10, re
         rel_err = np.inf
         rel_errs = [np.inf]
         while itr < N_itr_max and not rel_err < rel_err_tol:
+            print("within rotation")
+            print(itr)
             if itr == 0:
                 abd_prime = abd.copy()
                 chi_prime = abd_prime.bondi_dimensionless_spin()
@@ -764,6 +770,7 @@ def map_to_superrest_frame(
 
     """
     abd = self.copy()
+    print("1")
 
     if target_strain_input is not None:
         target_strain = target_strain_input.copy()
@@ -810,14 +817,17 @@ def map_to_superrest_frame(
             pass
             
         if itr == 0:
+            print("2")
             abd_interp_prime = abd_interp.transform(
                 supertranslation=BMS_transformation.supertranslation,
                 frame_rotation=BMS_transformation.frame_rotation.components,
                 boost_velocity=BMS_transformation.boost_velocity,
             )
+            print("3")
 
         for transformation in order:
             if transformation == "supertranslation":
+                print("supertranslation")
                 new_transformation, supertranslation_rel_errs = supertranslation_to_map_to_superrest_frame(
                     abd_interp_prime,
                     target_PsiM,
@@ -827,6 +837,7 @@ def map_to_superrest_frame(
                     print_conv=print_conv,
                 )
             elif transformation == "rotation":
+                print("rotation")
                 new_transformation, rot_rel_errs = rotation_to_map_to_superrest_frame(
                     abd_interp_prime,
                     target_strain=target_strain,
@@ -835,6 +846,7 @@ def map_to_superrest_frame(
                     print_conv=print_conv,
                 )
             elif transformation == "CoM_transformation":
+                print("CoM_transformation")
                 new_transformation, CoM_rel_errs = com_transformation_to_map_to_superrest_frame(
                     abd_interp_prime,
                     N_itr_max=N_itr_maxes["CoM_transformation"],
@@ -842,6 +854,7 @@ def map_to_superrest_frame(
                     print_conv=print_conv,
                 )
             elif transformation == "time_phase":
+                print("time_phase")
                 if target_strain is not None:
                     strain_interp_prime = scri.asymptotic_bondi_data.map_to_superrest_frame.MT_to_WM(
                         2.0 * abd_interp_prime.sigma.bar, dataType=scri.h
@@ -896,6 +909,8 @@ def map_to_superrest_frame(
     best_BMS_transformation = (time_translation.inverse() * best_BMS_transformation).reorder(
         ["supertranslation", "frame_rotation", "boost_velocity"]
     )
+    
+    best_BMS_transformation.to_file("full_bms.h5")
 
     # transform abd
     abd_prime = abd.transform(
