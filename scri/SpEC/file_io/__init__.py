@@ -544,4 +544,9 @@ def create_abd_from_h5(file_format, convention="SpEC", **kwargs):
         )
         abd.sigma = abd.sigma.bar
 
+    if "BondiSTPsi" in WMs:
+        abd.st_psi[:, sf.LM_index(WMs["BondiSTPsi"].ell_min, -WMs["BondiSTPsi"].ell_min, 0) :] = (
+            WMs["BondiSTPsi"].data
+        )
+
     return abd

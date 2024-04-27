@@ -60,7 +60,7 @@ class AsymptoticBondiData:
         if time.dtype != float:
             raise ValueError(f"Input `time` parameter must have dtype float; it has dtype {time.dtype}")
         ModesTS = functools.partial(ModesTimeSeries, ell_max=ell_max, multiplication_truncator=multiplication_truncator)
-        shape = [6, time.size, LM_total_size(0, ell_max)]
+        shape = [7, time.size, LM_total_size(0, ell_max)]
         self.frame = np.array([])
         self.frameType = frameType
         self._time = time.copy()
@@ -71,6 +71,7 @@ class AsymptoticBondiData:
         self._psi3 = ModesTS(self._raw_data[3], self._time, spin_weight=-1)
         self._psi4 = ModesTS(self._raw_data[4], self._time, spin_weight=-2)
         self._sigma = ModesTS(self._raw_data[5], self._time, spin_weight=2)
+        self._st_psi = ModesTS(self._raw_data[6], self._time, spin_weight=0)
 
     @property
     def time(self):
@@ -159,6 +160,15 @@ class AsymptoticBondiData:
         self._psi0[:] = psi0prm
         return self.psi0
 
+    @property
+    def st_psi(self):
+        return self._st_psi
+
+    @psi2.setter
+    def st_psi(self, stpsiprm):
+        self._st_psi[:] = stpsiprm
+        return self.st_psi
+
     def copy(self):
         import copy
 
@@ -177,6 +187,7 @@ class AsymptoticBondiData:
         new_abd.psi2 = self.psi2.interpolate(new_times)
         new_abd.psi1 = self.psi1.interpolate(new_times)
         new_abd.psi0 = self.psi0.interpolate(new_times)
+        new_abd.st_psi = self.st_psi.interpolate(new_times)
         # interpolate frame data if necessary
         if self.frame.shape[0] == self.n_times:
             import quaternion
