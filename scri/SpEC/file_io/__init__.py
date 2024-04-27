@@ -462,7 +462,7 @@ def create_abd_from_h5(file_format, convention="SpEC", **kwargs):
     # Load waveform data from H5 files into WaveformModes objects
     WMs = {}
     filenames = {}
-    for data_label in ["Psi4", "Psi3", "Psi2", "Psi1", "Psi0", "h", "BondiSTPsi"]:
+    for data_label in ["Psi4", "Psi3", "Psi2", "Psi1", "Psi0", "h", "st_psi"]:
         if data_label in kwargs:
             filenames[data_label] = kwargs.pop(data_label)
             if file_format == "sxs":

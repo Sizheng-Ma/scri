@@ -78,8 +78,8 @@ parsec_in_meters = 3.0856775814913672789139379577965e16  # m
 FrameType = [UnknownFrameType, Inertial, Coprecessing, Coorbital, Corotating] = range(5)
 FrameNames = ["UnknownFrameType", "Inertial", "Coprecessing", "Coorbital", "Corotating"]
 
-DataType = [UnknownDataType, psi0, psi1, psi2, psi3, psi4, sigma, h, hdot, news, psin, BondiSTPsi] = range(12)
-DataNames = ["UnknownDataType", "Psi0", "Psi1", "Psi2", "Psi3", "Psi4", "sigma", "h", "hdot", "news", "psin", "BondiSTPsi"]
+DataType = [UnknownDataType, psi0, psi1, psi2, psi3, psi4, sigma, h, hdot, news, psin, st_psi] = range(12)
+DataNames = ["UnknownDataType", "Psi0", "Psi1", "Psi2", "Psi3", "Psi4", "sigma", "h", "hdot", "news", "psin", "st_psi"]
 SpinWeights = [sys.maxsize, 2, 1, 0, -1, -2, 2, -2, -2, -2, sys.maxsize, 0]
 ConformalWeights = [sys.maxsize, 2, 1, 0, -1, -2, 1, 0, -1, -1, -3, 0]
 RScaling = [sys.maxsize, 5, 4, 3, 2, 1, 2, 1, 1, 1, 0, 1]
@@ -96,7 +96,7 @@ DataNamesLaTeX = [
     r"\dot{h}",
     r"\mathrm{n}",
     r"\psi_n",
-    r"\Psi_s"
+    r"\Psi_{st}"
 ]
 # It might also be worth noting that:
 # - the radius `r` has spin weight 0 and boost weight -1
@@ -186,7 +186,7 @@ __all__ = [
     "hdot",
     "news",
     "psin",
-    "BondiSTPsi",
+    "st_psi",
     "DataNames",
     "DataNamesLaTeX",
     "SpinWeights",
