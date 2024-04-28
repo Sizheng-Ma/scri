@@ -164,7 +164,7 @@ class AsymptoticBondiData:
     def st_psi(self):
         return self._st_psi
 
-    @psi2.setter
+    @st_psi.setter
     def st_psi(self, stpsiprm):
         self._st_psi[:] = stpsiprm
         return self.st_psi
