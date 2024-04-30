@@ -204,6 +204,7 @@ class AsymptoticBondiData:
         bianchi_0,
         bianchi_1,
         bianchi_2,
+        bianchi_2_stress_energy_tensor,
         constraint_3,
         constraint_4,
         constraint_mass_aspect,

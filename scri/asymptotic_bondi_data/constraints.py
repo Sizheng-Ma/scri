@@ -152,7 +152,11 @@ def bianchi_1(self, lhs=True, rhs=True):
         return lhs_value
     elif rhs:
         return rhs_value
-
+    
+    
+def bianchi_2_stress_energy_tensor(self):
+    import numpy as np
+    return 4*np.pi/3*(2*self.st_psi.dot *self.st_psi.dot-self.st_psi *self.st_psi.dot.dot)
 
 def bianchi_2(self, lhs=True, rhs=True):
     """Return the left- and/or right-hand sides of the Psi2 component of the Bianchi identity
@@ -177,6 +181,7 @@ def bianchi_2(self, lhs=True, rhs=True):
         lhs_value = self.psi2.dot
     if rhs:
         rhs_value = self.psi3.eth_GHP + self.sigma * self.psi4
+        rhs_value += self.bianchi_2_stress_energy_tensor()
     if lhs and rhs:
         return (lhs_value, rhs_value)
     elif lhs:
