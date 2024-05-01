@@ -91,6 +91,13 @@ def bondi_violation_norms(self):
     violations = self.bondi_violations
     return [v.norm() for v in violations]
 
+def bianchi_0_stress_energy_tensor(self):
+    import numpy as np
+    scalar=2*self.st_psi.eth_GHP*self.st_psi.eth_GHP
+    scalar-=self.st_psi*self.st_psi.eth_GHP.eth_GHP
+    scalar-=self.sigma.dot*self.st_psi*self.st_psi
+    scalar-=self.sigma*self.st_psi*self.st_psi.dot
+    return scalar.multiply(4*np.pi*np.sqrt(2))
 
 def bianchi_0(self, lhs=True, rhs=True):
     """Return the left- and/or right-hand sides of the Psi0 component of the Bianchi identity
@@ -115,6 +122,7 @@ def bianchi_0(self, lhs=True, rhs=True):
         lhs_value = self.psi0.dot
     if rhs:
         rhs_value = self.psi1.eth_GHP + 3 * self.sigma * self.psi2
+        rhs_value += self.bianchi_0_stress_energy_tensor()
     if lhs and rhs:
         return (lhs_value, rhs_value)
     elif lhs:
