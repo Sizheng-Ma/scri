@@ -97,7 +97,7 @@ def bianchi_0_stress_energy_tensor(self):
     scalar-=self.st_psi*self.st_psi.eth_GHP.eth_GHP
     scalar-=self.sigma.dot*self.st_psi*self.st_psi
     scalar-=self.sigma*self.st_psi*self.st_psi.dot
-    return scalar.multiply(4*np.pi*np.sqrt(2)*17/16.)
+    return scalar.multiply(4*np.pi)
 
 def bianchi_0(self, lhs=True, rhs=True):
     """Return the left- and/or right-hand sides of the Psi0 component of the Bianchi identity
