@@ -37,14 +37,18 @@ def mass_aspect(self, truncate_ell=max):
 
     """
     if callable(truncate_ell):
-        return -(self.psi2 + self.sigma.multiply(self.sigma.bar.dot, truncator=truncate_ell)).real
+        st_contribution = 4 * np.pi / 3 * self.st_psi.multiply(self.st_psi.dot, truncator=truncate_ell)
+        return -(self.psi2 + st_contribution + self.sigma.multiply(self.sigma.bar.dot, truncator=truncate_ell)).real
     elif truncate_ell:
+        st_contribution = 4 * np.pi / 3 * self.st_psi.multiply(self.st_psi.dot, truncator=lambda tup: truncate_ell)
         return -(
             self.psi2.truncate_ell(truncate_ell)
+            + st_contribution
             + self.sigma.multiply(self.sigma.bar.dot, truncator=lambda tup: truncate_ell)
         ).real
     else:
-        return -(self.psi2 + self.sigma * self.sigma.bar.dot).real
+        st_contribution = 4 * np.pi / 3 * self.st_psi * self.st_psi.dot
+        return -(self.psi2 + st_contribution + self.sigma * self.sigma.bar.dot).real
 
 
 def charge_vector_from_aspect(charge):
