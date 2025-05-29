@@ -586,6 +586,38 @@ def time_translation(abd, t_0=0):
     return abd_prime
 
 
+def rotation_new(abd, x, y, z, phi=0):
+    """Rotate an abd object.
+
+    This is faster than using abd.transform().
+    """
+    q = quaternion.from_rotation_vector(-phi * np.array([x, y, z]))
+
+    h = MT_to_WM(2.0 * abd.sigma.bar, False, scri.h)
+    Psi4 = MT_to_WM(0.5 * (-np.sqrt(2)) ** 4 * abd.psi4, False, scri.psi4)
+    Psi3 = MT_to_WM(0.5 * (-np.sqrt(2)) ** 3 * abd.psi3, False, scri.psi3)
+    Psi2 = MT_to_WM(0.5 * (-np.sqrt(2)) ** 2 * abd.psi2, False, scri.psi2)
+    Psi1 = MT_to_WM(0.5 * (-np.sqrt(2)) ** 1 * abd.psi1, False, scri.psi1)
+    Psi0 = MT_to_WM(0.5 * (-np.sqrt(2)) ** 0 * abd.psi0, False, scri.psi0)
+
+    h.rotate_physical_system(q)
+    Psi4.rotate_physical_system(q)
+    Psi3.rotate_physical_system(q)
+    Psi2.rotate_physical_system(q)
+    Psi1.rotate_physical_system(q)
+    Psi0.rotate_physical_system(q)
+
+    abd_rot = abd.copy()
+    abd_rot.sigma = 0.5 * WM_to_MT(h).bar
+    abd_rot.psi4 = 2 * (-1.0 / np.sqrt(2)) ** 4 * WM_to_MT(Psi4)
+    abd_rot.psi3 = 2 * (-1.0 / np.sqrt(2)) ** 3 * WM_to_MT(Psi3)
+    abd_rot.psi2 = 2 * (-1.0 / np.sqrt(2)) ** 2 * WM_to_MT(Psi2)
+    abd_rot.psi1 = 2 * (-1.0 / np.sqrt(2)) ** 1 * WM_to_MT(Psi1)
+    abd_rot.psi0 = 2 * (-1.0 / np.sqrt(2)) ** 0 * WM_to_MT(Psi0)
+
+    return abd_rot
+
+
 def rotation(abd, phi=0):
     """Rotate an abd object.
 
