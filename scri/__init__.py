@@ -152,7 +152,7 @@ WaveformModes.poincare_fluxes = poincare_fluxes
 from .waveform_grid import WaveformGrid
 
 # from .waveform_in_detector import WaveformInDetector
-from .extrapolation import extrapolate
+from .extrapolation import extrapolate, read_finite_radius_data_flat
 
 from .modes_time_series import ModesTimeSeries
 from .asymptotic_bondi_data import AsymptoticBondiData

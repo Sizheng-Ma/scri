@@ -214,6 +214,7 @@ def validate_group_of_waveforms(h5file, filename, WaveformNames):
         print("In '{}', the following waveforms are not valid:\n\t{}".format(filename, "\n\t".join(FailedWaveforms)))
     return Valid
 
+
 def datatype_from_filename(filename):
     from os.path import basename
     import scri
@@ -236,13 +237,14 @@ def datatype_from_filename(filename):
     else:
         DataType = scri.UnknownDataType
         message = (
-            "The file '{0}' does not contain a recognizable " +
-            "description "+
-            "of the data type ('h', 'psi4', 'psi3', 'psi2', "+
-            "'psi1', 'psi0')."
+            "The file '{0}' does not contain a recognizable "
+            + "description "
+            + "of the data type ('h', 'psi4', 'psi3', 'psi2', "
+            + "'psi1', 'psi0')."
         )
         raise ValueError(message.format(filename))
     return DataType
+
 
 def read_finite_radius_waveform_nrar(filename, WaveformName):
 
@@ -253,9 +255,9 @@ def read_finite_radius_waveform_nrar(filename, WaveformName):
 
     # Open the file twice.
     # The first time is for the auxiliary quantities.
-    with File(filename,"r") as f:
+    with File(filename, "r") as f:
         W = f[WaveformName]
-        
+
         # Read the time, account for repeated indices
         T = W["AverageLapse.dat"][:, 0]
         Indices = monotonic_indices(T)
@@ -269,20 +271,20 @@ def read_finite_radius_waveform_nrar(filename, WaveformName):
 
     # The second time we read the file is for the waveform
     waveform = scri.SpEC.file_io.read_from_h5(
-        os.path.join(filename,WaveformName),
+        os.path.join(filename, WaveformName),
         frameType=scri.Inertial,
         dataType=datatype_from_filename(filename),
         r_is_scaled_out=True,
-        m_is_scaled_out=False, # For now. We will change this later.
+        m_is_scaled_out=False,  # For now. We will change this later.
     )
-    
-    return waveform,T,Indices,Radii,AverageLapse,CoordRadius,InitialAdmEnergy
 
-def read_finite_radius_waveform_rpxmb_or_rpdmb(filename,
-                                               groupname, WaveformName):
-    """This is just a worker function defined for read_finite_radius_data, 
-       below, reading a single waveform from an h5 file of many waveforms. 
-       You probably don't need to call this directly.
+    return waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy
+
+
+def read_finite_radius_waveform_rpxmb_or_rpdmb(filename, groupname, WaveformName):
+    """This is just a worker function defined for read_finite_radius_data,
+    below, reading a single waveform from an h5 file of many waveforms.
+    You probably don't need to call this directly.
     """
 
     from h5py import File
@@ -294,37 +296,33 @@ def read_finite_radius_waveform_rpxmb_or_rpdmb(filename,
 
     # Open the file twice.
     # The first time reads the waveform.
-    rpdmb_formats=["rotating_paired_diff_multishuffle_bzip2", "rpdmb", "RPDMB"]
-    rpxmb_formats=["rotating_paired_xor_multishuffle_bzip2", "rpxmb", "rpxm",
-                   "RPXMB", "RPXM"]
-    json_path = filename.replace(".h5",".json")
+    rpdmb_formats = ["rotating_paired_diff_multishuffle_bzip2", "rpdmb", "RPDMB"]
+    rpxmb_formats = ["rotating_paired_xor_multishuffle_bzip2", "rpxmb", "rpxm", "RPXMB", "RPXM"]
+    json_path = filename.replace(".h5", ".json")
     read_rpxmb = False
     read_rpdmb = False
     if os.path.exists(json_path):
         with open(json_path) as f:
-            full_group_name = groupname + '/' + WaveformName
+            full_group_name = groupname + "/" + WaveformName
             json_data = json.load(f)[full_group_name]
-        sxs_format = json_data.get("sxs_format","")
+        sxs_format = json_data.get("sxs_format", "")
         if sxs_format in rpdmb_formats:
-            read_rpdmb=True
+            read_rpdmb = True
         elif sxs_format in rpdmb_formats:
-            read_rpxmb=True
+            read_rpxmb = True
 
     # Note that groupname begins with a '/' so
     # os.path.join(filename,groupname,WaveformName) does not work.
     if read_rpxmb:
-        waveform=scri.rpxmb.load(filename+groupname+"/"+
-                                 WaveformName)[0].to_inertial_frame()
+        waveform = scri.rpxmb.load(filename + groupname + "/" + WaveformName)[0].to_inertial_frame()
     elif read_rpdmb:
-        waveform=scri.WaveformModes.from_sxs(
-            sxs.rpdmb.load(filename+groupname+"/"+WaveformName))
+        waveform = scri.WaveformModes.from_sxs(sxs.rpdmb.load(filename + groupname + "/" + WaveformName))
     else:
-        raise ValueError("Cannot find rpxmb/rpdmb format string "
-                         " in {}, group {}".format(json_path,groupname))
+        raise ValueError("Cannot find rpxmb/rpdmb format string " " in {}, group {}".format(json_path, groupname))
     T = waveform.t
 
     # The second time we read the file is for the auxiliary quantities.
-    with File(filename,"r") as f:
+    with File(filename, "r") as f:
         W = f[groupname][WaveformName]
 
         # Account for repeated indices in time.
@@ -337,7 +335,8 @@ def read_finite_radius_waveform_rpxmb_or_rpdmb(filename,
         CoordRadius = W["CoordRadius.dat"][1]
         InitialAdmEnergy = W["InitialAdmEnergy.dat"][1]
 
-    return waveform,T,Indices,Radii,AverageLapse,CoordRadius,InitialAdmEnergy
+    return waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy
+
 
 def read_finite_radius_waveform(filename, groupname, WaveformName, ChMass):
     from scipy.integrate import cumulative_trapezoid as integrate
@@ -345,20 +344,19 @@ def read_finite_radius_waveform(filename, groupname, WaveformName, ChMass):
     import scri
 
     if groupname is None:
-       waveform,T,Indices,Radii,AverageLapse,CoordRadius,InitialAdmEnergy = \
-           read_finite_radius_waveform_nrar(filename,WaveformName)
+        waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy = read_finite_radius_waveform_nrar(
+            filename, WaveformName
+        )
     else:
-       waveform,T,Indices,Radii,AverageLapse,CoordRadius,InitialAdmEnergy = \
-           read_finite_radius_waveform_rpxmb_or_rpdmb(filename,
-                                                      groupname,WaveformName)
+        waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy = (
+            read_finite_radius_waveform_rpxmb_or_rpdmb(filename, groupname, WaveformName)
+        )
 
     # Rescale and offset the time array so that the time array is
     # approximately the tortoise coordinate.
-    T[1:] = integrate(AverageLapse / sqrt(((-2.0 * InitialAdmEnergy) / Radii)\
-                                          + 1.0), T) + T[0]
-    T -= Radii + (2.0 * InitialAdmEnergy) \
-        * log((Radii / (2.0 * InitialAdmEnergy)) - 1.0)
-   
+    T[1:] = integrate(AverageLapse / sqrt(((-2.0 * InitialAdmEnergy) / Radii) + 1.0), T) + T[0]
+    T -= Radii + (2.0 * InitialAdmEnergy) * log((Radii / (2.0 * InitialAdmEnergy)) - 1.0)
+
     # Now determine the scaling with mass.
     if waveform.dataType == scri.h:
         UnitScaleFactor = 1.0 / ChMass
@@ -376,17 +374,17 @@ def read_finite_radius_waveform(filename, groupname, WaveformName, ChMass):
         UnitScaleFactor = 1.0 / ChMass
         RadiusRatioExp = 3.0
     elif waveform.dataType == scri.psi1:
-        UnitScaleFactor = 1.0 / ChMass ** 2
+        UnitScaleFactor = 1.0 / ChMass**2
         RadiusRatioExp = 4.0
     elif waveform.dataType == scri.psi0:
-        UnitScaleFactor = 1.0 / ChMass ** 3
+        UnitScaleFactor = 1.0 / ChMass**3
         RadiusRatioExp = 5.0
     else:
         raise ValueError(f'DataType "{waveform.dataType}" is unknown.')
 
     # The read_finite_radius_waveform_* functions removed nonmonotonic times
     # from T but did not do the same for the waveform data. So we do that here.
-    waveform.data = waveform.data[Indices,:]
+    waveform.data = waveform.data[Indices, :]
 
     # We also need to remove nonmonontonic times from the frame, if the
     # frame has the appropriate shape.
@@ -395,33 +393,60 @@ def read_finite_radius_waveform(filename, groupname, WaveformName, ChMass):
 
     # Rescale the times and the data
     RadiusRatio = (Radii / CoordRadius) ** RadiusRatioExp
-    waveform.t = T/ChMass
-    for m,_ in enumerate(waveform.LM):
-        waveform.data[:,m] *= RadiusRatio * UnitScaleFactor
+    waveform.t = T / ChMass
+    for m, _ in enumerate(waveform.LM):
+        waveform.data[:, m] *= RadiusRatio * UnitScaleFactor
     waveform.m_is_scaled_out = True
 
     # Add the history information
-    history =  (
-        """# extrapolation.read_finite_radius_waveform""" +
-        """({0}, {1}, {2}, {3})"""
-    )
+    history = """# extrapolation.read_finite_radius_waveform""" + """({0}, {1}, {2}, {3})"""
     history = history.format(
         filename,
         groupname,
         WaveformName,
         ChMass,
     )
-    waveform.history=[history]
+    waveform.history = [history]
 
-    return waveform, Radii/ChMass
-        
-def read_finite_radius_data(ChMass=0.0,
-                            filename="rh_FiniteRadii_CodeUnits.h5",
-                            CoordRadii=[]):
+    return waveform, Radii / ChMass
+
+
+def read_finite_radius_waveform_flat(filename, groupname, WaveformName):
+    from scipy.integrate import cumulative_trapezoid as integrate
+    from numpy import log, sqrt
+    import scri
+
+    if groupname is None:
+        waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy = read_finite_radius_waveform_nrar(
+            filename, WaveformName
+        )
+    else:
+        waveform, T, Indices, Radii, AverageLapse, CoordRadius, InitialAdmEnergy = (
+            read_finite_radius_waveform_rpxmb_or_rpdmb(filename, groupname, WaveformName)
+        )
+
+    # Rescale and offset the time array so that the time array is
+    # approximately the tortoise coordinate.
+    T -= Radii
+
+    # The read_finite_radius_waveform_* functions removed nonmonotonic times
+    # from T but did not do the same for the waveform data. So we do that here.
+    waveform.data = waveform.data[Indices, :]
+
+    # We also need to remove nonmonontonic times from the frame, if the
+    # frame has the appropriate shape.
+    if waveform.frame.shape[0] > 1:
+        waveform.frame = waveform.frame[Indices]
+
+    # Rescale the times and the data
+    waveform.t = T
+    waveform.m_is_scaled_out = False
+
+    return waveform, Radii
+
+
+def read_finite_radius_data_flat(filename="PhiPlus_FiniteRadii_CodeUnits.h5", CoordRadii=[]):
     """Read data at various radii, and offset by tortoise coordinate."""
-
-    if ChMass == 0.0:
-        raise ValueError("ChMass=0.0 is not a valid input value.")
 
     from sys import stdout, stderr
     from os.path import basename
@@ -430,7 +455,7 @@ def read_finite_radius_data(ChMass=0.0,
     import scri
 
     YLMRegex = re_compile(mode_regex)
-    
+
     # If 'filename' is of the form "h5_file_name.h5/groupname" then we have an
     # RPXMB file, and groupname identifies the quantity we are extrapolating.
     # Otherwise, we have a NRAR finite-radius file and the filename identifies
@@ -466,15 +491,18 @@ def read_finite_radius_data(ChMass=0.0,
             if type(CoordRadii[0]) == int:
                 WaveformNames = [WaveformNames[i] for i in CoordRadii]
                 CoordRadii = [
-                    m.group("r") for Name in CoordRadii
-                    for m in
-                    [ re_compile(r"""R(?P<r>.*?)\.dir""").search(Name)] if m ]
+                    m.group("r") for Name in CoordRadii for m in [re_compile(r"""R(?P<r>.*?)\.dir""").search(Name)] if m
+                ]
             else:
                 WaveformNames = [
-                    Name for Name in WaveformNames for Radius in
-                    CoordRadii for m in [re_compile(Radius).search(Name)] if m]
+                    Name
+                    for Name in WaveformNames
+                    for Radius in CoordRadii
+                    for m in [re_compile(Radius).search(Name)]
+                    if m
+                ]
         NWaveforms = len(WaveformNames)
-        
+
         # Check input data for NRAR format
         if groupname is None:
             if not validate_group_of_waveforms(f, filename, WaveformNames):
@@ -501,10 +529,100 @@ def read_finite_radius_data(ChMass=0.0,
             stdout.write(WaveformNameString)
             stdout.flush()
             PrintedLine += WaveformNameString
-        Ws[n], Radii[n] = read_finite_radius_waveform(filename,groupname,
-                                                      WaveformNames[n],
-                                                      ChMass)
+        Ws[n], Radii[n] = read_finite_radius_waveform_flat(filename, groupname, WaveformNames[n])
     return Ws, Radii, CoordRadii
+
+
+def read_finite_radius_data(ChMass=0.0, filename="rh_FiniteRadii_CodeUnits.h5", CoordRadii=[]):
+    """Read data at various radii, and offset by tortoise coordinate."""
+
+    if ChMass == 0.0:
+        raise ValueError("ChMass=0.0 is not a valid input value.")
+
+    from sys import stdout, stderr
+    from os.path import basename
+    from h5py import File
+    from re import compile as re_compile
+    import scri
+
+    YLMRegex = re_compile(mode_regex)
+
+    # If 'filename' is of the form "h5_file_name.h5/groupname" then we have an
+    # RPXMB file, and groupname identifies the quantity we are extrapolating.
+    # Otherwise, we have a NRAR finite-radius file and the filename identifies
+    # the quantity we are extrapolating.
+    groupname = None
+    if ".h5" in filename and not filename.endswith(".h5"):
+        filename, groupname = filename.split(".h5")
+        filename = filename + ".h5"
+        if groupname == "/":
+            groupname = None
+
+    try:
+        f = File(filename, "r")
+    except OSError:
+        print(f"read_finite_radius_data could not open the file '{filename}'")
+        raise
+    try:
+        # Get list of waveforms we'll be using
+        if groupname is None:
+            WaveformNames = list(f)
+            # VersionHist.ver is not one of the WaveformNames.
+            if "VersionHist.ver" in WaveformNames:
+                WaveformNames.remove("VersionHist.ver")
+        else:
+            WaveformNames = list(f[groupname])
+        if not CoordRadii:
+            # If the list of Radii is empty, figure out what they are
+            CoordRadii = [
+                m.group("r") for Name in WaveformNames for m in [re_compile(r"""R(?P<r>.*?)\.dir""").search(Name)] if m
+            ]
+        else:
+            # Pare down the WaveformNames list appropriately
+            if type(CoordRadii[0]) == int:
+                WaveformNames = [WaveformNames[i] for i in CoordRadii]
+                CoordRadii = [
+                    m.group("r") for Name in CoordRadii for m in [re_compile(r"""R(?P<r>.*?)\.dir""").search(Name)] if m
+                ]
+            else:
+                WaveformNames = [
+                    Name
+                    for Name in WaveformNames
+                    for Radius in CoordRadii
+                    for m in [re_compile(Radius).search(Name)]
+                    if m
+                ]
+        NWaveforms = len(WaveformNames)
+
+        # Check input data for NRAR format
+        if groupname is None:
+            if not validate_group_of_waveforms(f, filename, WaveformNames):
+                raise ValueError(f"Bad input waveforms in {filename}.")
+            stdout.write(f"{filename} passed the data-integrity tests.\n")
+            stdout.flush()
+        Ws = [scri.WaveformModes() for i in range(NWaveforms)]
+        Radii = [None] * NWaveforms
+
+    finally:
+        f.close()
+
+    PrintedLine = ""
+    for n in range(NWaveforms):
+        if n == NWaveforms - 1:
+            WaveformNameString = WaveformNames[n] + "\n"
+        else:
+            WaveformNameString = WaveformNames[n] + ", "
+        if len(PrintedLine + WaveformNameString) > 100:
+            stdout.write("\n" + WaveformNameString)
+            stdout.flush()
+            PrintedLine = WaveformNameString
+        else:
+            stdout.write(WaveformNameString)
+            stdout.flush()
+            PrintedLine += WaveformNameString
+        Ws[n], Radii[n] = read_finite_radius_waveform(filename, groupname, WaveformNames[n], ChMass)
+    return Ws, Radii, CoordRadii
+
 
 def set_common_time(Ws, Radii, MinTimeStep=0.005, EarliestTime=-3e300, LatestTime=3e300):
     """Interpolate Waveforms and radius data to a common set of times."""
@@ -680,7 +798,17 @@ def extrapolate(**kwargs):
         import matplotlib.pyplot as plt
 
         mpl.rcParams["axes.prop_cycle"] = mpl.cycler(
-            "color", ["#000000", "#cc79a7", "#d55e00", "#0072b2", "#f0e442", "#56b4e9", "#e69f00", "#2b9f78",],
+            "color",
+            [
+                "#000000",
+                "#cc79a7",
+                "#d55e00",
+                "#0072b2",
+                "#f0e442",
+                "#56b4e9",
+                "#e69f00",
+                "#2b9f78",
+            ],
         )
         figabs = plt.figure(0)
         figarg = plt.figure(1)
@@ -689,8 +817,7 @@ def extrapolate(**kwargs):
     # Read in the Waveforms
     print(f"Reading Waveforms from {DataFile}...")
     stdout.flush()
-    Ws, Radii, CoordRadii = read_finite_radius_data(
-        ChMass=ChMass, filename=DataFile, CoordRadii=CoordRadii)
+    Ws, Radii, CoordRadii = read_finite_radius_data(ChMass=ChMass, filename=DataFile, CoordRadii=CoordRadii)
 
     Radii_shape = (len(Radii), len(Radii[0]))
 
@@ -765,7 +892,7 @@ def extrapolate(**kwargs):
 
     # If required, figure out the orbital frequencies
     if UseOmega:
-        Omegas = [sqrt(sum([c ** 2 for c in o])) for o in W_outer.AngularVelocityVectorRelativeToInertial([2])]
+        Omegas = [sqrt(sum([c**2 for c in o])) for o in W_outer.AngularVelocityVectorRelativeToInertial([2])]
     else:
         Omegas = []
 
@@ -983,9 +1110,13 @@ def extrapolate(**kwargs):
             if PlotFormat != "png":
                 figabs.savefig("{}/{}ExtrapConvergence_Abs.{}".format(OutputDirectory, FileNamePrefixString, "png"))
             plt.gca().set_xlim(MaxNormTime - 500.0, MaxNormTime + 200.0)
-            figabs.savefig("{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat))
+            figabs.savefig(
+                "{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat)
+            )
             if PlotFormat != "png":
-                figabs.savefig("{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png"))
+                figabs.savefig(
+                    "{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png")
+                )
             plt.close(figabs)
             plt.figure(1)
             plt.legend(
@@ -1007,9 +1138,13 @@ def extrapolate(**kwargs):
             if PlotFormat != "png":
                 figarg.savefig("{}/{}ExtrapConvergence_Arg.{}".format(OutputDirectory, FileNamePrefixString, "png"))
             plt.gca().set_xlim(MaxNormTime - 500.0, MaxNormTime + 200.0)
-            figarg.savefig("{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat))
+            figarg.savefig(
+                "{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat)
+            )
             if PlotFormat != "png":
-                figarg.savefig("{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png"))
+                figarg.savefig(
+                    "{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png")
+                )
             plt.close(figarg)
             plt.figure(2)
             plt.legend(
@@ -1143,27 +1278,45 @@ def FindPossibleExtrapolationsToRun(TopLevelInputDir):
             if "metadata.txt" in step[2]:
                 if "rh_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "rh_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "rh_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
                 if "rPsi4_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "rPsi4_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "rPsi4_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
                 if "r2Psi3_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "r2Psi3_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "r2Psi3_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
                 if "r3Psi2_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "r3Psi2_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "r3Psi2_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
                 if "r4Psi1_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "r4Psi1_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "r4Psi1_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
                 if "r5Psi0_FiniteRadii_CodeUnits.h5" in step[2]:
                     SubdirectoriesAndDataFiles.append(
-                        [step[0].replace(TopLevelInputDir + "/", ""), "r5Psi0_FiniteRadii_CodeUnits.h5",]
+                        [
+                            step[0].replace(TopLevelInputDir + "/", ""),
+                            "r5Psi0_FiniteRadii_CodeUnits.h5",
+                        ]
                     )
     return SubdirectoriesAndDataFiles
 
@@ -1249,7 +1402,7 @@ def _Extrapolate(FiniteRadiusWaveforms, Radii, ExtrapolationOrders, Omegas=None,
     NModes = FiniteRadiusWaveforms[0].n_modes
     NFiniteRadii = len(FiniteRadiusWaveforms)
     NExtrapolations = len(ExtrapolationOrders)
-    #SVDTol = 1.0e-12  # Same as Numerical Recipes default in fitsvd.h
+    # SVDTol = 1.0e-12  # Same as Numerical Recipes default in fitsvd.h
     DataType = FiniteRadiusWaveforms[NFiniteRadii - 1].dataType
     ExcludeInsignificantRadii = DataType in [scri.psi1, scri.psi0] and bool(NoiseFloor)
     if ExcludeInsignificantRadii:
