@@ -181,6 +181,390 @@ def validate_single_waveform(h5file, filename, WaveformName, ExpectedNModes, Exp
     return Valid
 
 
+def extrapolate_flat(**kwargs):
+
+    # Basic imports
+    from os import makedirs, remove
+    from os.path import exists, basename, dirname
+    from sys import stdout, stderr
+    from textwrap import dedent
+    from numpy import sqrt, abs, fmod, pi, transpose, array
+    from scipy.interpolate import splev, splrep
+    import scri
+    from scri import Inertial, Corotating, WaveformModes
+
+    # Process keyword arguments
+    InputDirectory = kwargs.pop("InputDirectory", "./")
+    OutputDirectory = kwargs.pop("OutputDirectory", "./")
+    DataFile = kwargs.pop("DataFile", "PhiPlus_FiniteRadii_CodeUnits.h5")
+    CoordRadiiKwarg = kwargs.get("CoordRadii", None)
+    CoordRadii = kwargs.pop("CoordRadii", [])
+    ExtrapolationOrders = kwargs.pop("ExtrapolationOrders", [-1, 2, 3, 4, 5, 6])
+    UseOmega = kwargs.pop("UseOmega", False)
+    OutputFrame = kwargs.pop("OutputFrame", Inertial)
+    ExtrapolatedFiles = kwargs.pop("ExtrapolatedFiles", "Extrapolated_N{N}.h5")
+    DifferenceFiles = kwargs.pop("DifferenceFiles", "ExtrapConvergence_N{N}-N{Nm1}.h5")
+    UseStupidNRARFormat = kwargs.pop("UseStupidNRARFormat", False)
+    MinTimeStep = kwargs.pop("MinTimeStep", 0.005)
+    EarliestTime = kwargs.pop("EarliestTime", -3.0e300)
+    LatestTime = kwargs.pop("LatestTime", 3.0e300)
+    AlignmentTime = kwargs.pop("AlignmentTime", None)
+    NoiseFloor = kwargs.pop("NoiseFloor", None)
+    return_finite_radius_waveforms = kwargs.pop("return_finite_radius_waveforms", False)
+    if len(kwargs) > 0:
+        raise ValueError(f"Unknown arguments to `extrapolate`: kwargs={kwargs}")
+
+    # Polish up the input arguments
+    if not InputDirectory.endswith("/"):
+        InputDirectory += "/"
+    if OutputDirectory and not OutputDirectory.endswith("/"):
+        OutputDirectory += "/"
+    if not exists(DataFile):
+        DataFile = InputDirectory + DataFile
+
+    # AlignmentTime is reset properly once the data are read in, if necessary.
+    # The reasonableness of ExtrapolationOrder is checked below.
+
+    # Read in the Waveforms
+    print(f"Reading Waveforms from {DataFile}...")
+    stdout.flush()
+    Ws, Radii, CoordRadii = read_finite_radius_data_flat(filename=DataFile, CoordRadii=CoordRadii)
+
+    Radii_shape = (len(Radii), len(Radii[0]))
+
+    # Make sure there are enough radii to do the requested extrapolations
+    if (len(Ws) <= max(ExtrapolationOrders)) and (max(ExtrapolationOrders) > -1):
+        raise ValueError(
+            "Not enough data sets ({}) for max extrapolation order (N={}).".format(len(Ws), max(ExtrapolationOrders))
+        )
+    if -len(Ws) > min(ExtrapolationOrders):
+        raise ValueError(
+            "Not enough data sets ({}) for min extrapolation order (N={}).".format(len(Ws), min(ExtrapolationOrders))
+        )
+
+    # Figure out which is the outermost data
+    SortedRadiiIndices = sorted(range(len(CoordRadii)), key=lambda k: float(CoordRadii[k]))
+    i_outer = SortedRadiiIndices[-1]
+
+    # Interpolate to common times
+    print("Interpolating to common times...")
+    stdout.flush()
+    set_common_time(Ws, Radii, MinTimeStep, EarliestTime, LatestTime)
+    W_outer = Ws[i_outer]
+
+    # If the AlignmentTime is not set properly, set it to the default
+    if (not AlignmentTime) or AlignmentTime < W_outer.t[0] or AlignmentTime >= W_outer.t[-1]:
+        AlignmentTime = (W_outer.t[0] + W_outer.t[-1]) / 2.0
+
+    # Print the input arguments neatly for the history
+    InputArguments = """\
+        # Extrapolation input arguments:
+        D = {{}}
+        D['InputDirectory'] = {InputDirectory}
+        D['OutputDirectory'] = {OutputDirectory}
+        D['DataFile'] = {DataFile}
+        D['CoordRadii'] = {CoordRadii}
+        D['ExtrapolationOrders'] = {ExtrapolationOrders}
+        D['UseOmega'] = {UseOmega}
+        D['OutputFrame'] = {OutputFrame}
+        D['ExtrapolatedFiles'] = {ExtrapolatedFiles}
+        D['DifferenceFiles'] = {DifferenceFiles}
+        D['UseStupidNRARFormat'] = {UseStupidNRARFormat}
+        D['MinTimeStep'] = {MinTimeStep}
+        D['EarliestTime'] = {EarliestTime}
+        D['LatestTime'] = {LatestTime}
+        D['AlignmentTime'] = {AlignmentTime}
+        D['NoiseFloor'] = {NoiseFloor}
+        # End Extrapolation input arguments
+        """.format(
+        InputDirectory=InputDirectory,
+        OutputDirectory=OutputDirectory,
+        DataFile=DataFile,
+        CoordRadii=CoordRadii,
+        ExtrapolationOrders=ExtrapolationOrders,
+        UseOmega=UseOmega,
+        OutputFrame=OutputFrame,
+        ExtrapolatedFiles=ExtrapolatedFiles,
+        DifferenceFiles=DifferenceFiles,
+        UseStupidNRARFormat=UseStupidNRARFormat,
+        MinTimeStep=MinTimeStep,
+        EarliestTime=EarliestTime,
+        LatestTime=LatestTime,
+        AlignmentTime=AlignmentTime,
+        NoiseFloor=NoiseFloor,
+    )
+    InputArguments = dedent(InputArguments)
+
+    # Remove old h5 file if necessary
+    if not ExtrapolatedFiles.endswith(".dat") and UseStupidNRARFormat:
+        h5Index = ExtrapolatedFiles.find(".h5/")
+        if h5Index > 0:
+            if exists(ExtrapolatedFiles[: h5Index + 3]):
+                remove(ExtrapolatedFiles[: h5Index + 3])
+
+    # Do the actual extrapolations
+    print("Running extrapolations.")
+    stdout.flush()
+    return
+    # Ws = Waveforms(_vectorW(Ws))
+    # Ws.CommonTimeIsSet()
+    # print([i for i in range(1)]); stdout.flush()
+    # ExtrapolatedWaveformsObject = Ws.extrapolate(Radii, ExtrapolationOrders, Omegas)
+    # print(type(ExtrapolatedWaveformsObject))
+    # print([10])
+    # for i in range(10):
+    #     print("Yep"); stdout.flush()
+    # print([i for i in range(1)]); stdout.flush()
+    # ExtrapolatedWaveforms = [ExtrapolatedWaveformsObject.GetWaveform(i)
+    #                         for i in range(ExtrapolatedWaveformsObject.size())]
+    ExtrapolatedWaveforms = _Extrapolate(Ws, Radii, ExtrapolationOrders, Omegas, NoiseFloor)
+
+    NExtrapolations = len(ExtrapolationOrders)
+    for i, ExtrapolationOrder in enumerate(ExtrapolationOrders):
+        # If necessary, rotate
+        if OutputFrame == Inertial or OutputFrame == Corotating:
+            stdout.write(f"N={ExtrapolationOrder}: Rotating into inertial frame... ")
+            stdout.flush()
+            ExtrapolatedWaveforms[i].to_inertial_frame()
+            print("☺")
+            stdout.flush()
+        if OutputFrame == Corotating:
+            stdout.write(f"N={ExtrapolationOrder}: Rotating into corotating frame... ")
+            stdout.flush()
+            ExtrapolatedWaveforms[i].to_corotating_frame()
+            print("☺")
+            stdout.flush()
+
+        # Append the relevant information to the history
+        ExtrapolatedWaveforms[i]._append_history(str(InputArguments))
+        ExtrapolatedWaveforms[i].extrapolate_coord_radii = CoordRadiiKwarg
+
+        # Output the data
+        if OutputDirectory:
+            ExtrapolatedFile = OutputDirectory + ExtrapolatedFiles.format(N=ExtrapolationOrder)
+            stdout.write(f"N={ExtrapolationOrder}: Writing {ExtrapolatedFile}... ")
+            stdout.flush()
+            if not exists(OutputDirectory):
+                makedirs(OutputDirectory)
+            if ExtrapolatedFile.endswith(".dat"):
+                ExtrapolatedWaveforms[i].Output(
+                    dirname(ExtrapolatedFile)
+                    + "/"
+                    + ExtrapolatedWaveforms[i].descriptor_string
+                    + "_"
+                    + ExtrapolatedWaveforms[i].frame_type_string
+                    + "_"
+                    + basename(ExtrapolatedFile)
+                )
+
+            else:
+                from scri.SpEC import write_to_h5
+
+                if i == 0:
+                    file_write_mode = "w"
+                else:
+                    file_write_mode = "a"
+                write_to_h5(
+                    ExtrapolatedWaveforms[i],
+                    ExtrapolatedFile,
+                    file_write_mode=file_write_mode,
+                    use_NRAR_format=UseStupidNRARFormat,
+                )
+            print("☺")
+            stdout.flush()
+
+    if OutputDirectory:
+        MaxNormTime = ExtrapolatedWaveforms[0].max_norm_time()
+        FileNamePrefixString = (
+            ExtrapolatedWaveforms[0].descriptor_string + "_" + ExtrapolatedWaveforms[0].frame_type_string + "_"
+        )
+        if PlotFormat:
+            figabs.gca().set_xlabel(r"$(t-r_\ast)/M$")
+            figarg.gca().set_xlabel(r"$(t-r_\ast)/M$")
+            fignorm.gca().set_xlabel(r"$(t-r_\ast)/M$")
+            figabs.gca().set_ylabel(
+                r"$\Delta\, \mathrm{abs} \left( " + ExtrapolatedWaveforms[0].data_type_latex + r" \right) $"
+            )
+            figarg.gca().set_ylabel(
+                r"$\Delta\, \mathrm{uarg} \left( " + ExtrapolatedWaveforms[0].data_type_latex + r" \right) $"
+            )
+            fignorm.gca().set_ylabel(
+                r"$\left\| \Delta\, " + ExtrapolatedWaveforms[0].data_type_latex + r" \right\|_{L_2} $"
+            )
+
+        for i, ExtrapolationOrder in reversed(list(enumerate(ExtrapolationOrders))):
+            if i > 0:  # Compare to the last one
+                if DifferenceFiles or PlotFormat:
+                    Diff = scri.WaveformModes(ExtrapolatedWaveforms[i].compare(ExtrapolatedWaveforms[i - 1]))
+                if DifferenceFiles:
+                    DifferenceFile = OutputDirectory + DifferenceFiles.format(
+                        N=ExtrapolationOrder, Nm1=ExtrapolationOrders[i - 1]
+                    )
+                    stdout.write(f"N={ExtrapolationOrder}: Writing {DifferenceFile}... ")
+                    stdout.flush()
+                    if DifferenceFile.endswith(".dat"):
+                        Diff.Output(
+                            dirname(DifferenceFile)
+                            + "/"
+                            + Diff.descriptor_string
+                            + "_"
+                            + Diff.frame_type_string
+                            + "_"
+                            + basename(DifferenceFile)
+                        )
+                    else:
+                        from scri.SpEC import write_to_h5
+
+                        write_to_h5(Diff, DifferenceFile, use_NRAR_format=UseStupidNRARFormat)
+                    print("☺")
+                    stdout.flush()
+                if PlotFormat:
+                    # stdout.write("Plotting... "); stdout.flush()
+                    Interpolated = scri.WaveformModes(ExtrapolatedWaveforms[i].interpolate(Diff.t))
+                    Normalization = Interpolated.norm(True)
+                    rep_A = splrep(
+                        ExtrapolatedWaveforms[i].t,
+                        ExtrapolatedWaveforms[i].abs[:, ExtrapolatedWaveforms[i].index(2, 2)],
+                        s=0,
+                    )
+                    rep_B = splrep(
+                        ExtrapolatedWaveforms[i - 1].t,
+                        ExtrapolatedWaveforms[i - 1].abs[:, ExtrapolatedWaveforms[i - 1].index(2, 2)],
+                        s=0,
+                    )
+                    AbsA = splev(Diff.t, rep_A, der=0)
+                    AbsB = splev(Diff.t, rep_B, der=0)
+                    AbsDiff = abs(AbsA - AbsB) / AbsA
+                    rep_arg_A = splrep(
+                        ExtrapolatedWaveforms[i].t,
+                        ExtrapolatedWaveforms[i].arg_unwrapped[:, ExtrapolatedWaveforms[i].index(2, 2)],
+                        s=0,
+                    )
+                    rep_arg_B = splrep(
+                        ExtrapolatedWaveforms[i].t,
+                        ExtrapolatedWaveforms[i - 1].arg_unwrapped[:, ExtrapolatedWaveforms[i - 1].index(2, 2)],
+                        s=0,
+                    )
+                    ArgDiff = splev(Diff.t, rep_arg_A, der=0) - splev(Diff.t, rep_arg_B, der=0)
+
+                    if abs(ArgDiff[len(ArgDiff) // 3]) > 1.9 * pi:
+                        ArgDiff -= 2 * pi * round(ArgDiff[len(ArgDiff) // 3] / (2 * pi))
+                    plt.figure(0)
+                    plt.semilogy(
+                        Diff.t,
+                        AbsDiff,
+                        label=r"$(N={}) - (N={})$".format(ExtrapolationOrder, ExtrapolationOrders[i - 1]),
+                    )
+                    plt.figure(1)
+                    plt.semilogy(
+                        Diff.t,
+                        abs(ArgDiff),
+                        label=r"$(N={}) - (N={})$".format(ExtrapolationOrder, ExtrapolationOrders[i - 1]),
+                    )
+                    plt.figure(2)
+                    plt.semilogy(
+                        Diff.t,
+                        Diff.norm(True) / Normalization,
+                        label=r"$(N={}) - (N={})$".format(ExtrapolationOrder, ExtrapolationOrders[i - 1]),
+                    )
+                    # print("☺"); stdout.flush()
+
+        # Finish up the plots and save
+        if PlotFormat:
+            stdout.write("Saving plots... ")
+            stdout.flush()
+            plt.figure(0)
+            plt.legend(
+                borderpad=0.2,
+                labelspacing=0.1,
+                handlelength=1.5,
+                handletextpad=0.1,
+                loc="lower left",
+                prop={"size": "small"},
+            )
+            plt.gca().set_ylim(1e-8, 10)
+            plt.gca().axvline(x=MaxNormTime, ls="--")
+            try:
+                from matplotlib.pyplot import tight_layout
+
+                tight_layout(pad=0.5)
+            except:
+                pass
+            figabs.savefig("{}/{}ExtrapConvergence_Abs.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat))
+            if PlotFormat != "png":
+                figabs.savefig("{}/{}ExtrapConvergence_Abs.{}".format(OutputDirectory, FileNamePrefixString, "png"))
+            plt.gca().set_xlim(MaxNormTime - 500.0, MaxNormTime + 200.0)
+            figabs.savefig(
+                "{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat)
+            )
+            if PlotFormat != "png":
+                figabs.savefig(
+                    "{}/{}ExtrapConvergence_Abs_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png")
+                )
+            plt.close(figabs)
+            plt.figure(1)
+            plt.legend(
+                borderpad=0.2,
+                labelspacing=0.1,
+                handlelength=1.5,
+                handletextpad=0.1,
+                loc="lower left",
+                prop={"size": "small"},
+            )
+            plt.gca().set_xlabel("")
+            plt.gca().set_ylim(1e-8, 10)
+            plt.gca().axvline(x=MaxNormTime, ls="--")
+            try:
+                tight_layout(pad=0.5)
+            except:
+                pass
+            figarg.savefig("{}/{}ExtrapConvergence_Arg.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat))
+            if PlotFormat != "png":
+                figarg.savefig("{}/{}ExtrapConvergence_Arg.{}".format(OutputDirectory, FileNamePrefixString, "png"))
+            plt.gca().set_xlim(MaxNormTime - 500.0, MaxNormTime + 200.0)
+            figarg.savefig(
+                "{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat)
+            )
+            if PlotFormat != "png":
+                figarg.savefig(
+                    "{}/{}ExtrapConvergence_Arg_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png")
+                )
+            plt.close(figarg)
+            plt.figure(2)
+            plt.legend(
+                borderpad=0.2,
+                labelspacing=0.1,
+                handlelength=1.5,
+                handletextpad=0.1,
+                loc="lower left",
+                prop={"size": "small"},
+            )
+            plt.gca().set_ylim(1e-6, 10)
+            plt.gca().axvline(x=MaxNormTime, ls="--")
+            try:
+                tight_layout(pad=0.5)
+            except:
+                pass
+            fignorm.savefig("{}/{}ExtrapConvergence_Norm.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat))
+            if PlotFormat != "png":
+                fignorm.savefig("{}/{}ExtrapConvergence_Norm.{}".format(OutputDirectory, FileNamePrefixString, "png"))
+            plt.gca().set_xlim(MaxNormTime - 500.0, MaxNormTime + 200.0)
+            fignorm.savefig(
+                "{}/{}ExtrapConvergence_Norm_Merger.{}".format(OutputDirectory, FileNamePrefixString, PlotFormat)
+            )
+            if PlotFormat != "png":
+                fignorm.savefig(
+                    "{}/{}ExtrapConvergence_Norm_Merger.{}".format(OutputDirectory, FileNamePrefixString, "png")
+                )
+            plt.close(fignorm)
+            print("☺")
+            stdout.flush()
+
+    if return_finite_radius_waveforms:
+        return ExtrapolatedWaveforms, Ws
+    return ExtrapolatedWaveforms
+
+
 def validate_group_of_waveforms(h5file, filename, WaveformNames):
     from re import compile as re_compile
     import scri
