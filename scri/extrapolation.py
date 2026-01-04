@@ -305,7 +305,6 @@ def extrapolate_flat(**kwargs):
     # Do the actual extrapolations
     print("Running extrapolations.")
     stdout.flush()
-    return
     # Ws = Waveforms(_vectorW(Ws))
     # Ws.CommonTimeIsSet()
     # print([i for i in range(1)]); stdout.flush()
@@ -317,7 +316,8 @@ def extrapolate_flat(**kwargs):
     # print([i for i in range(1)]); stdout.flush()
     # ExtrapolatedWaveforms = [ExtrapolatedWaveformsObject.GetWaveform(i)
     #                         for i in range(ExtrapolatedWaveformsObject.size())]
-    ExtrapolatedWaveforms = _Extrapolate(Ws, Radii, ExtrapolationOrders, Omegas, NoiseFloor)
+    ExtrapolatedWaveforms = _Extrapolate(Ws, Radii, ExtrapolationOrders, NoiseFloor)
+    return ExtrapolatedWaveforms, Ws
 
     NExtrapolations = len(ExtrapolationOrders)
     for i, ExtrapolationOrder in enumerate(ExtrapolationOrders):
